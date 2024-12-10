@@ -74,6 +74,7 @@ class UserUpdateForm(forms.ModelForm):
     postal_code = forms.IntegerField()
     country = forms.CharField(max_length=100)
 
+    password = None
     class Meta:
         model = User
         fields = ['first_name', 'last_name', 'email']

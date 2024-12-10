@@ -23,4 +23,4 @@ class Transfer(models.Model):
     
     
     def __str__(self):
-        return self.transfer_account
+        return str(self.transfer_account)

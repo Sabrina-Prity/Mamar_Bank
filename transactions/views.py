@@ -206,48 +206,58 @@ class LoanListView(LoginRequiredMixin,ListView):
         print(queryset)
         return queryset
     
-
-
-class TransferView(LoginRequiredMixin,CreateView):
+    
+    
+class TransferView(LoginRequiredMixin, CreateView):
     template_name = 'transactions/money_transfer.html'
     form_class = TransferForm
     success_url = reverse_lazy('transfer_amount')
     title = 'Transfer Money'
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
-            'title':self.title
+            'title': self.title
         })
         return context
 
-    def form_valid(self,form):
+    def form_valid(self, form):
         amount = form.cleaned_data.get('amount')
-        print(amount, 'amount')
-        transfer_account = form.cleaned_data.get('transfer_account')
-        print(transfer_account, 'Transfer account')
+        transfer_account_no = form.cleaned_data.get('transfer_account')
         active_account = self.request.user.account
-        print(active_account, 'Active account')
 
-        transfer_account = UserBankAccount.objects.filter(account_no=transfer_account).first()
-       
-        # reciver_account = get_object_or_404(UserBankAccount,account_no=transfer_account)
-
+        transfer_account = UserBankAccount.objects.filter(account_no=transfer_account_no).first()
         if transfer_account is None:
-            raise ValueError("Account is not Exits")
-        
-           
-        if  active_account.balance != 0  and active_account.balance > 0 and active_account.balance > amount:
-            transfer_account.balance += amount
-            
-            active_account.balance -= amount
-            active_account.save()
-            transfer_account.save()
-                    
-            messages.success(self.request,'Successfully Transfer.')
-            
-     
+            messages.error(self.request, 'Transfer account does not exist.')
+            return self.form_invalid(form)
+
+        if active_account.balance <= 0 or active_account.balance < amount:
+            messages.error(self.request, 'Insufficient balance.')
+            return self.form_invalid(form)
+
+        # Deduct from sender and add to receiver
+        transfer_account.balance += amount
+        active_account.balance -= amount
+        active_account.save()
+        transfer_account.save()
+
+        # Send email to sender
+        send_transaction_email(
+            user=self.request.user,
+            amount=amount,
+            subject="Money Transfer Successful",
+            template="transactions/sender_email.html"
+        )
+
+        # Send email to receiver
+        send_transaction_email(
+            user=transfer_account.user,
+            amount=amount,
+            subject="Money Received",
+            template="transactions/receiver_email.html"
+        )
+
+        messages.success(self.request, 'Transfer successful.')
         return super().form_valid(form)
-    
 
 
